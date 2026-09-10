@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Compile check (stdlib only, no install)
+        run: |
+          python3 -m py_compile \
+            web_demo.py text_to_sql.py sqlantra_database_v2.py \
+            context_memory.py hitl_workflow.py \
+            test_system.py test_workflow.py test_workflow2.py test_rapid.py
+
+      - name: Run unit + workflow tests
+        run: |
+          python3 test_system.py
+          python3 test_workflow2.py
+
+      - name: Run HITL workflow tests
+        run: |
+          python3 test_workflow.py
+          python3 test_rapid.py
+
+      - name: Golden-set regression gate (rule-based, LLM off)
+        run: |
+          python3 eval_golden_set.py

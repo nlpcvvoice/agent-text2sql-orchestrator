@@ -1,10 +1,34 @@
 # Agent Text2SQL Orchestrator
 
-An LLM-orchestrated text-to-SQL demo system with agent routing, human-in-the-loop approval, layered data pipelines, and persistent context memory. Runs on Python standard library only; SQLite-backed.
+[![CI](https://github.com/nlpcvvoice/agent-text2sql-orchestrator/actions/workflows/ci.yml/badge.svg)](https://github.com/nlpcvvoice/agent-text2sql-orchestrator/actions)
+
+A stateful agent pipeline that converts natural-language e-commerce questions into SQL, enforces a human-in-the-loop approval gate on high-value actions, and refreshes a layered analytics store on every query. Zero third-party runtime dependencies.
+
+> **One-second summary:** type a business question → an 8-stage agent orchestrates skill matching, SQL generation (LLM with deterministic fallback), execution, approval checks, and insight output → you get an auditable, human-gated result.
+
+## Live demo
+
+Demo endpoint is being set up (see [Deployment roadmap](#deployment-roadmap)). Until then, the fastest way to evaluate the system:
+
+```bash
+python3 web_demo.py        # no setup, no packages
+# open http://localhost:8766
+```
 
 ## Why this exists
 
-This project demonstrates how an agent workflow can wrap a text-to-SQL capability rather than treating SQL generation as a single-shot LLM call. The query path is decomposed into explicit stages — skill matching, agent routing, SQL generation (LLM with deterministic fallback), context logging, execution, pipeline refresh, and insight generation — so every step is observable and testable. A human-in-the-loop gate interrupts high-value transactions before they are committed.
+This project demonstrates how an agent workflow can wrap a text-to-SQL capability rather than treating SQL generation as a single-shot LLM call. The query path is decomposed into explicit stages — skill matching, agent routing, SQL generation (LLM with deterministic fallback), context logging, execution, pipeline refresh, and insight generation — so every step is observable and testable. A human-in-the-loop approval gate interrupts high-value actions before they are committed.
+
+## Key design decisions
+
+| Decision | Choice | Rationale |
+|---|---|---|
+| SQL generation | LLM with rule-based fallback | A deterministic fallback keeps the pipeline usable when the model is unreachable; the two paths make quality differences measurable (see [Evaluation](#evaluation)) |
+| Human-in-the-loop | Tool-permissioning gate with category thresholds | Instead of blanket approvals, each action type maps to a threshold (e.g., travel > $1000), mirroring how production agents gate side-effecting tool calls |
+| Runtime | Python standard library only | No `requirements.txt`, no dependency drift; the heavy lifting is the orchestration logic, not libraries |
+| Storage | SQLite | Zero-ops persistence with real SQL semantics suitable for a self-contained demo; schema is portable to Postgres |
+| Pipeline | Bronze → Silver → Gold on every execution | Query results refresh a medallion store, so text-to-SQL is wired into data engineering, not an island feature |
+| Web surface | Single-file server + embedded UI | One `python3 web_demo.py` to inspect every stage, memory log, and approval — reviewers see the full loop without setup |
 
 ## Highlights
 
@@ -12,7 +36,7 @@ This project demonstrates how an agent workflow can wrap a text-to-SQL capabilit
 |---|---|---|
 | Text-to-SQL | Converts natural language to SQL via LLM, with a rule-based deterministic fallback when the model is unavailable | `text_to_sql.py` |
 | Agent orchestration | 8-stage pipeline: skill matching → agent routing → SQL → memory → execution → pipeline → HITL check → insights | `web_demo.py` |
-| Human-in-the-loop | High-value operations create approval requests; approve/reject decisions are recorded and enforced | `hitl_workflow.py` |
+| Human-in-the-loop | Tool-permissioning gate: high-value actions create approval requests with category thresholds; decisions are recorded and enforced | `hitl_workflow.py` |
 | Context memory | Every stage, LLM call, SQL statement and decision is logged with timestamps and metadata; searchable | `context_memory.py` |
 | Data pipeline | Bronze → Silver → Gold layers with daily sales, product performance, and customer 360 aggregations | `sqlantra_database_v2.py` |
 | Web UI | Embedded 4-panel interface: input/approval, live workflow, database viewer, memory browser | `web_demo.py` |
@@ -76,6 +100,23 @@ Default model/endpoint are declared in `web_demo.py` and `text_to_sql.py` (`MODE
 | `/api/reset` | POST | Reset database and state |
 | `/api/hitl/respond` | POST | Approve/reject a request |
 
+## Evaluation
+
+The SQL generation path is measured against a golden set of 30 hand-labeled e-commerce queries (12 exact-rule hits, 6 near-rule, 12 LLM-only). Every query maps to an expected SQL statement; the system compares the generated SQL (LLM vs rule-based fallback) for exact-match, validity (executes without error), and normalized equivalence (equal result rows).
+
+| Path | Exact-match | Valid | Equivalent | Median latency |
+|---|---|---|---|---|
+| `rule_based_sql` (deterministic) | 18/30 (60%) | 30/30 (100%) | 18/30 (60%) | 0 ms |
+| LLM (OpenRouter free, 2-run avg) | 12/30 (40%) | 30/30 (100%) | 23/30 (76.7%) | ~2.2 s |
+
+Class split on the rule-based path: 12/12 exact on covered patterns, 0/12 on LLM-only intents — the fallback is a safety net, not a generalizer. LLM wins on equivalent correctness (+16.7 pp) at a latency cost — the core tradeoff the dual-path design is built around. Free-model availability is variable (see [Testing](#testing) for offline verification). Run locally:
+
+```bash
+python3 eval_golden_set.py   # prints the comparison table above with real numbers
+```
+
+The harness lives near the top of the repo (see [Project Layout](#project-layout)) and doubles as a regression test: any change that lowers pass rate below the baseline fails the [CI](#testing) gate.
+
 ## Testing
 
 ```bash
@@ -113,6 +154,18 @@ curl -s -X POST http://localhost:8766/api/query \
 - SQL and pipeline architecture (bronze/silver/gold, aggregations)
 - Web API design (REST endpoints, embedded single-file UI)
 - Python standard-library engineering (zero third-party runtime dependencies)
+
+## Deployment roadmap
+
+The system is designed to ship as a single container. Planned path:
+
+| Step | Target |
+|---|---|
+| Package | `Dockerfile` + `start.sh` wrapping `web_demo.py` on port 8766 |
+| Host | Hugging Face Space or Railway (free tier) |
+| Outcome | Persistent public URL for the web UI and `/api/*` endpoints |
+
+Until the endpoint is live, local verification via `python3 web_demo.py` is the canonical path.
 
 ## License
 
