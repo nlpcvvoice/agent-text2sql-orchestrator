@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Databases
+*.db
+*.sqlite3
+
+# Runtime artifacts
+server.out
+server.err
+server.log
+nohup.out
+
+# Sessions & handover junk
+session-*.md
+*.backup
+*.backup.*
+
+# Temp / scratch
+/tmp/
+
+# OS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
