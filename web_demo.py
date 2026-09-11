@@ -1263,7 +1263,7 @@ _handler = None
 
 def main():
     global _handler
-    from http.server import HTTPServer, BaseHTTPRequestHandler
+    from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
     _handler = SqlantraDemoHandler()
 
@@ -1347,7 +1347,7 @@ def main():
                 self.send_response(404)
                 self.end_headers()
 
-    server = HTTPServer(("", PORT), Request)
+    server = ThreadingHTTPServer(("", PORT), Request)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

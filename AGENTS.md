@@ -189,6 +189,13 @@ curl -X POST http://localhost:8766/api/reset
 python3 test_system.py
 ```
 
+### Performance benchmark
+```bash
+python3 metrics_bench.py                     # QPS / p50 / p95 / error rate under load
+python3 eval_golden_set.py                   # golden-set accuracy (rule vs LLM)
+```
+Server (`web_demo.py`) uses `ThreadingHTTPServer`; per-request cost is dominated by the bronze→silver→gold pipeline rebuild on read (~205 ms of ~210 ms).
+
 ---
 
 ## Ollama Integration

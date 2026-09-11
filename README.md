@@ -117,6 +117,34 @@ python3 eval_golden_set.py   # prints the comparison table above with real numbe
 
 The harness lives near the top of the repo (see [Project Layout](#project-layout)) and doubles as a regression test: any change that lowers pass rate below the baseline fails the [CI](#testing) gate.
 
+## Performance under load
+
+Measured with `metrics_bench.py` (mixed 10-query set, N concurrent clients, 30 requests/wave, rule path):
+
+| Concurrency | QPS | p50 (ms) | p95 (ms) | Error rate | Cost/query |
+|---|---|---|---|---|---|
+| 1 | 4.5 | 157 | 427 | 0.0% | $0.000 (local) |
+| 5 | 3.5 | 1154 | 2447 | 0.0% | $0.000 |
+| 10 | 3.8 | 2425 | 3905 | 0.0% | $0.000 |
+| 20 | 3.6 | 4359 | 5655 | 0.0% | $0.000 |
+
+A single request costs ~210 ms, of which ~205 ms is the **pipeline write path** (bronze → silver → gold is recomputed on every read); SQL parsing and querying are ~3 ms. Under concurrency, SQLite write-lock contention shows up as p50/p95 growth rather than throughput loss; error rate stays 0%.
+
+`run: python3 metrics_bench.py`
+
+## Known failure modes
+
+Deliberately documented so the guarantees are explicit (and the trade-offs are visible to reviewers).
+
+| Failure mode | Trigger | Observable behavior | Mitigation |
+|---|---|---|---|
+| LLM hallucinates SQL (fabricated columns/joins) | coverage gap in rule set | wrong-but-syntactically-valid query | rule-based fallback still executes; `SELECT`-only discipline; post-processing fixups |
+| LLM emits prose/fenced response | model returns text instead of SQL | non-SELECT output | stripping (` ```sql ` fences), `SELECT` prefix guard, else fallback |
+| Rule set misses intent | out-of-vocabulary phrasing | falls back to generic `completed orders` query | routed to LLM path instead; golden set tracks coverage (`LLM_ONLY` class) |
+| Free model unavailable / rate-limited | OpenRouter 429 or Ollama down | latency spikes, eventual fallback | model list rotation with retries, then deterministic rule path |
+| SQLite write contention | high concurrency on read+rebuild | p50/p95 growth (see table) | single-writer design for the demo; WAL or Postgres for production |
+| Threshold boundary | expense exactly at category limit | gate decision depends on `>` vs `>=` | thresholds centralized in `hitl_workflow.py`, used by both reporter and gate |
+
 ## Testing
 
 ```bash
@@ -162,7 +190,8 @@ The system is designed to ship as a single container. Planned path:
 | Step | Target |
 |---|---|
 | Package | `Dockerfile` + `start.sh` wrapping `web_demo.py` on port 8766 |
-| Host | Hugging Face Space or Railway (free tier) |
+| Host | Hugging Face Space — basic CPU tier (preferred; stdlib + SQLite need no GPU) |
+| Alt. host | HF Spaces **ZeroGPU** (GPU-backed, for a future local-LLM inference variant) or Railway free tier |
 | Outcome | Persistent public URL for the web UI and `/api/*` endpoints |
 
 Until the endpoint is live, local verification via `python3 web_demo.py` is the canonical path.
