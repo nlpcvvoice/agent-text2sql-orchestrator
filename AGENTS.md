@@ -17,13 +17,8 @@ Sqlantra System V2 is an enterprise AI orchestration platform that demonstrates:
 ## Quick Start
 
 ```bash
-# Clone/copy project to new machine
-cd /path/to/Sqlantra-local-ollama_mysql_v2_1
-
-# Start system (no installation needed)
 python3 web_demo.py
-
-# Open browser to http://localhost:8766
+# open http://localhost:8766
 ```
 
 ---
@@ -31,16 +26,13 @@ python3 web_demo.py
 ## Project Structure
 
 ```
-Sqlantra-local-ollama_mysql_v2_1/
-├── web_demo.py           # Main entry point - HTTP server + HTML UI (ALL in one file)
-├── sqlantra_database_v2.py   # SQLite database initialization and CRUD operations
-├── text_to_sql.py       # Natural language to SQL conversion (Ollama + rule-based)
-├── context_memory.py    # SqlantraContextMemory class - operation tracking and state persistence
-├── hitl_workflow.py    # HITLWorkflow class - approval request handling
-├── AGENTS.md          # This file
-├── README.md          # User documentation
-├── Sqlantra_System_V2_Architecture_Flow.md   # Architecture diagrams
-└── COMPREHENSIVE_DOCUMENTATION.md       # Full technical documentation
+web_demo.py                # Main entry point - HTTP server + HTML UI (single file)
+sqlantra_database_v2.py    # SQLite database initialization and CRUD operations
+text_to_sql.py             # Natural language to SQL conversion (LLM + rule-based fallback)
+context_memory.py          # SqlantraContextMemory class - operation tracking and state persistence
+hitl_workflow.py           # HITLWorkflow class - approval request handling
+eval_golden_set.py         # Golden-set evaluation (rule vs LLM)
+metrics_bench.py           # Load benchmark (QPS / p50 / p95 / error rate)
 ```
 
 ---
@@ -63,7 +55,7 @@ Sqlantra-local-ollama_mysql_v2_1/
 
 ## Key Modules
 
-### 1. web_demo.py (876 lines)
+### 1. web_demo.py
 Main server - contains:
 - HTTP server on port 8766
 - Complete HTML/CSS/JS interface embedded
@@ -139,22 +131,9 @@ When user clicks "Send Request", the system enters step-by-step mode:
 
 ## Configuration
 
-### Model Configuration
-In `web_demo.py`:
-```python
-MODEL = "qwen3.5:2b-q4_K_M"  # Line 21
-PORT = 8766                 # Line 23
-```
+### Configuration
 
-### Database Path
-```python
-DB_PATH = "/tmp/sqlantra_v2_demo.db"  # In sqlantra_database_v2.py
-```
-
-### Memory Storage
-```python
-MEMORY_PATH = "/tmp/sqlantra_context_memory.json"  # In context_memory.py
-```
+Default model and endpoints are declared in `web_demo.py` (`MODEL`, `PORT`) and `text_to_sql.py` (`MODEL`, `OLLAMA_URL`).
 
 ---
 
@@ -202,14 +181,14 @@ Server (`web_demo.py`) uses `ThreadingHTTPServer`; per-request cost is dominated
 
 ### Installation
 ```bash
-# Install Ollama (see https://ollama.com)
-ollama pull qwen3.5:2b-q4_K_M
+ollama pull <model>
+# see https://ollama.com
 ```
 
 ### How It Works
 - System tries to call Ollama at `http://localhost:11434/api/generate`
 - If Ollama unavailable or fails, falls back to `rule_based_sql()`
-- Model can be changed in `web_demo.py` line 21
+- Model is configured in `web_demo.py` and `text_to_sql.py`
 
 ---
 
@@ -325,23 +304,6 @@ curl -X POST http://localhost:8766/api/reset
 
 ---
 
-## Architecture Research (v3 folder)
-
-See `/Sqlantra-local-ollama_mysql_v3/Sqlantra_Architecture_Research.md` for:
-- Data Warehouse vs ERP analysis
-- Snowflake Cortex integration scenarios
-- MySQL and MongoDB Atlas demo designs
-- Scalable backend architecture options
-- Kubernetes microservices design
-- Multi-tenant SaaS architecture explanation
-- Postman API tool原理
-- Bronze/Silver/Gold pipeline analysis
-- Context Memory enhancement ideas
-- MCP Tool Registry design
-- Comprehensive demo flow design
-
----
-
 ## Verification Commands
 
 ```bash
@@ -358,4 +320,4 @@ curl -s -X POST http://localhost:8766/api/query \
 
 ---
 
-*Last updated: 2026-04-25*
+*Last updated: 2026-09-14*
