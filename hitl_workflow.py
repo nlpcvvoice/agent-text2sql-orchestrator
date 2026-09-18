@@ -1,38 +1,20 @@
 #!/usr/bin/env python3
 """Sqlantra HITL Workflow - Expense Reimbursement Approval System."""
 
-import json
 from datetime import datetime
 from typing import Dict, Any, Optional, List, Callable
-import urllib.request
-import urllib.error
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "qwen3.5:2b"
+import llm_client
+
+OLLAMA_URL = llm_client.OLLAMA_URL
+MODEL = llm_client.OLLAMA_MODEL
 
 HIGH_VALUE_THRESHOLD = 500
 
 
 def call_ollama(prompt: str, timeout: int = 60) -> str:
-    """Call Ollama with a prompt."""
-    try:
-        req = urllib.request.Request(
-            OLLAMA_URL,
-            data=json.dumps(
-                {
-                    "model": MODEL,
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {"temperature": 0.1, "num_predict": 512},
-                }
-            ).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=timeout) as response:
-            result = json.loads(response.read().decode())
-            return result.get("response", "")
-    except Exception as e:
-        return f"[Ollama Error: {e}]"
+    """Unified LLM call: OpenRouter first, local Ollama fallback."""
+    return llm_client.call_llm(prompt, timeout=timeout)
 
 
 class ExpenseCategory:

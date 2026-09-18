@@ -1,36 +1,18 @@
 #!/usr/bin/env python3
 """Sqlantra Text-to-SQL Module - Rule-based with Ollama fallback."""
 
-import json
 import re
 from typing import Optional, Dict, Any
-import urllib.request
-import urllib.error
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "qwen3.5:2b-q4_K_M"
+import llm_client
+
+OLLAMA_URL = llm_client.OLLAMA_URL
+MODEL = llm_client.OLLAMA_MODEL
 
 
 def call_ollama(prompt: str, timeout: int = 60) -> str:
-    """Call Ollama with a prompt."""
-    try:
-        req = urllib.request.Request(
-            OLLAMA_URL,
-            data=json.dumps(
-                {
-                    "model": MODEL,
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {"temperature": 0.1, "num_predict": 512},
-                }
-            ).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=timeout) as response:
-            result = json.loads(response.read().decode())
-            return result.get("response", "")
-    except Exception as e:
-        return f"Error calling Ollama: {e}"
+    """Unified LLM call: OpenRouter first, local Ollama fallback."""
+    return llm_client.call_llm(prompt, timeout=timeout)
 
 
 def get_table_schemas() -> str:
@@ -212,7 +194,7 @@ SQL Query:"""
 
         response = call_ollama(prompt, timeout=30)
         # Check for error before processing
-        if response.startswith("Error calling Ollama") or not response.strip():
+        if response.startswith("Error calling LLM") or not response.strip():
             raise Exception("Ollama unavailable")
         sql = response.strip()
         if sql.startswith("```sql"):

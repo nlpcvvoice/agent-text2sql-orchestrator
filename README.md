@@ -78,12 +78,16 @@ python3 web_demo.py
 # open http://localhost:8766
 ```
 
-LLM is optional. Without Ollama, the system runs entirely on the rule-based SQL fallback:
+LLM is optional. Without a model backend, the system runs entirely on the rule-based SQL fallback:
 
 ```bash
 # optional: enable LLM-backed SQL generation
+# 1) OpenRouter (default when OPENROUTER_API_KEY is set, no local install)
+# 2) local Ollama, e.g.:
 ollama pull qwen3.5:2b-q4_K_M
 ```
+
+Model selection is priority-ordered in `llm_client.py`: OpenRouter free models first, then local Ollama, then the deterministic rule path.
 
 Default model/endpoint are declared in `web_demo.py` and `text_to_sql.py` (`MODEL`, `OLLAMA_URL`, `PORT`).
 

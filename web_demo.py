@@ -5,8 +5,6 @@ import sys
 import os
 import json
 from datetime import datetime
-from urllib.request import urlopen, Request
-from urllib.error import URLError
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -14,11 +12,12 @@ import sqlantra_database_v2 as db
 import text_to_sql
 import context_memory
 import hitl_workflow
+import llm_client
 
 db.init_database()
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "qwen3.5:2b-q4_K_M"
+OLLAMA_URL = llm_client.OLLAMA_URL
+MODEL = llm_client.OLLAMA_MODEL
 
 PORT = 8766
 
@@ -919,25 +918,8 @@ class SqlantraDemoHandler:
         )
 
     def call_ollama(self, prompt: str, timeout: int = 60) -> str:
-        """Call Ollama."""
-        try:
-            req = Request(
-                OLLAMA_URL,
-                data=json.dumps(
-                    {
-                        "model": MODEL,
-                        "prompt": prompt,
-                        "stream": False,
-                        "options": {"temperature": 0.1, "num_predict": 512},
-                    }
-                ).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
-            )
-            with urlopen(req, timeout=timeout) as response:
-                result = json.loads(response.read().decode())
-                return result.get("response", "")
-        except Exception as e:
-            return f"[Ollama Error: {e}]"
+        """Unified LLM call: OpenRouter first, local Ollama fallback."""
+        return llm_client.call_llm(prompt, timeout=timeout)
 
     def handle(self, path: str):
         if path == "/" or path == "":

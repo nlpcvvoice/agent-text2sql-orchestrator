@@ -4,7 +4,7 @@
 
 Sqlantra System V2 is an enterprise AI orchestration platform that demonstrates:
 - Real SQLite database with orders/products/order_items tables
-- **Text-to-SQL** using Ollama (or rule-based fallback if Ollama unavailable)
+- **Text-to-SQL** using LLM (OpenRouter or Ollama, rule-based fallback)
 - HITL (Human-In-The-Loop) approval workflow with approve/reject buttons
 - Context Memory System for state persistence and intelligent recall
 - Data Pipeline (Bronze/Silver/Gold layers)
@@ -75,8 +75,8 @@ Database operations:
 ### 3. text_to_sql.py (~250 lines)
 Text-to-SQL conversion:
 - `text_to_sql(query)` - Main entry point
-- `rule_based_sql(query)` - Fallback when Ollama unavailable
-- `call_ollama(prompt)` - Call Ollama API
+- `rule_based_sql(query)` - Deterministic fallback when LLM unavailable
+- `call_ollama(prompt)` - Unified LLM call (OpenRouter first, Ollama fallback)
 - Schema-aware prompt engineering
 
 ### 4. context_memory.py (~600 lines)
@@ -177,18 +177,14 @@ Server (`web_demo.py`) uses `ThreadingHTTPServer`; per-request cost is dominated
 
 ---
 
-## Ollama Integration
+## LLM Integration
 
-### Installation
-```bash
-ollama pull <model>
-# see https://ollama.com
-```
+### How It Works (priority order, in `llm_client.py`)
+1. **OpenRouter** (default): when `OPENROUTER_API_KEY` env var is set, uses free models (`nvidia/nemotron-3-super-120b-a12b:free` etc.) via chat-completions, with a fallback model list on 429/errors.
+2. **Local Ollama**: without the key, calls Ollama at `http://localhost:11434/api/generate` (offline development).
+3. **Rule-based fallback**: if the LLM call fails (`Error calling LLM:`), falls back to `rule_based_sql()`.
 
-### How It Works
-- System tries to call Ollama at `http://localhost:11434/api/generate`
-- If Ollama unavailable or fails, falls back to `rule_based_sql()`
-- Model is configured in `web_demo.py` and `text_to_sql.py`
+Model/URL config lives in `llm_client.py`; `web_demo.py`, `text_to_sql.py`, and `hitl_workflow.py` delegate to `llm_client.call_llm`. Never print or log the API key (log `key_set=True/False` only).
 
 ---
 
@@ -198,7 +194,7 @@ ollama pull <model>
 - User queries and inputs
 - Skill matching decisions
 - Agent routing selections
-- Ollama LLM calls (with prompts and responses)
+- LLM calls (with prompts and responses)
 - SQL generation and execution
 - Database query results
 - HITL approval requests and responses
